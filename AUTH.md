@@ -8,7 +8,7 @@ This app uses Google OAuth for login. There's no username/password — users sig
 
 When someone logs in, we give them two tokens:
 
-- **Access token** — short-lived (1 hour), used on every API request
+- **Access token** — short-lived (15 minutes), used on every API request
 - **Refresh token** — long-lived (30 days), used only to get a new access token
 
 Both are stored as `HttpOnly` cookies, so JavaScript on the page can never read them.
@@ -49,7 +49,7 @@ sequenceDiagram
 
 ## Refreshing the access token
 
-The access token expires after 1 hour. When that happens, the client calls `POST /auth/refresh`. The refresh token gets rotated on every call — the old one is thrown away and a new one is issued.
+The access token expires after 15 minutes. When that happens, the client calls `POST /auth/refresh`. The refresh token gets rotated on every call — the old one is thrown away and a new one is issued.
 
 ```mermaid
 sequenceDiagram
@@ -146,7 +146,7 @@ One user can have multiple sessions (multiple devices). Deleting a user cascades
 
 | Cookie | HttpOnly | Secure (prod) | SameSite | Max-Age |
 |---|---|---|---|---|
-| accessToken | yes | yes | Lax | 1 hour |
+| accessToken | yes | yes | Lax | 15 minutes |
 | refreshToken | yes | yes | Lax | 30 days |
 
 `Secure` is only set in production (`NODE_ENV=production`) so local dev over HTTP still works.
@@ -174,7 +174,7 @@ gantt
     axisFormat  %s
 
     section Access Token
-    Valid (1 hour)     : 0, 3600
+    Valid (15 minutes)     : 0, 900
 
     section Refresh Token
     Valid (30 days)    : 0, 2592000

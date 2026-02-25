@@ -45,7 +45,7 @@ export async function googleCallbackHandler(c: Context) {
 
   sessionRepository.deleteExpiredSessions().catch(() => {});
 
-  setCookie(c, "accessToken", accessToken, { ...COOKIE_BASE, maxAge: 60 * 60 });
+  setCookie(c, "accessToken", accessToken, { ...COOKIE_BASE, maxAge: 15 * 60 });
   setCookie(c, "refreshToken", refreshToken, { ...COOKIE_BASE, maxAge: 30 * 24 * 60 * 60 });
 
   return c.redirect("/");
@@ -85,7 +85,7 @@ export async function refreshTokenHandler(c: Context) {
     throw new SessionExpiredError();
   }
 
-  setCookie(c, "accessToken", newAccessToken, { ...COOKIE_BASE, maxAge: 60 * 60 });
+  setCookie(c, "accessToken", newAccessToken, { ...COOKIE_BASE, maxAge: 15 * 60 });
   setCookie(c, "refreshToken", newRefreshToken, { ...COOKIE_BASE, maxAge: 30 * 24 * 60 * 60 });
 
   return c.json({ ok: true });

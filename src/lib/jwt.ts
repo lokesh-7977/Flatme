@@ -3,12 +3,12 @@ import { config } from "../config/env";
 
 const JWT_SECRET = new TextEncoder().encode(config.JWT_SECRET);
 
-// Access token: 1 hour
+// Access token: 15 minutes
 export async function signAccessToken(userId: string): Promise<string> {
   return new SignJWT({ userId, type: "access" })
     .setProtectedHeader({ alg: "HS256" })
     .setIssuedAt()
-    .setExpirationTime("1h")
+    .setExpirationTime("15m")
     .sign(JWT_SECRET);
 }
 
