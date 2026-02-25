@@ -1,5 +1,5 @@
 import { userRepository } from "../repositories/userRepository";
-import type { User } from "../db/schema";
+import type { User } from "../db";
 import type { GoogleUser } from "../types/authTypes";
 
 export const userService = {

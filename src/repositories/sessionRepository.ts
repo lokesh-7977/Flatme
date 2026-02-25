@@ -1,7 +1,7 @@
 import { and, eq, lt } from "drizzle-orm";
 import { db } from "../db";
-import { sessionsTable } from "../db/schema";
-import type { Session } from "../db/schema";
+import { sessionsTable } from "../db";
+import type { Session } from "../db";
 import { uuidv7 } from "uuidv7";
 
 export const sessionRepository = {
@@ -12,7 +12,7 @@ export const sessionRepository = {
       sessionId?: string;
       userAgent?: string;
       ipAddress?: string;
-    }
+    },
   ): Promise<Session> {
     const sessionId = metadata?.sessionId ?? uuidv7();
     const expiresAt = new Date();
@@ -41,7 +41,7 @@ export const sessionRepository = {
   async rotateRefreshToken(
     sessionId: string,
     oldToken: string,
-    newToken: string
+    newToken: string,
   ): Promise<Session | null> {
     const result = await db
       .update(sessionsTable)
@@ -49,8 +49,8 @@ export const sessionRepository = {
       .where(
         and(
           eq(sessionsTable.id, sessionId),
-          eq(sessionsTable.refreshToken, oldToken)
-        )
+          eq(sessionsTable.refreshToken, oldToken),
+        ),
       )
       .returning();
 
@@ -76,6 +76,8 @@ export const sessionRepository = {
   },
 
   async deleteExpiredSessions(): Promise<void> {
-    await db.delete(sessionsTable).where(lt(sessionsTable.expiresAt, new Date()));
+    await db
+      .delete(sessionsTable)
+      .where(lt(sessionsTable.expiresAt, new Date()));
   },
 };
