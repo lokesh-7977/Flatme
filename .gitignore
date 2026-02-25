@@ -1,0 +1,42 @@
+# Dependencies
+node_modules/
+bun.lock
+
+# Environment & secrets
+.env
+.env.*
+!.env.example
+
+# Build output
+dist/
+build/
+out/
+
+# Drizzle generated output (keep migrations dir but not meta)
+drizzle/meta/
+
+# Logs
+*.log
+logs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+
+# Claude AI
+CLAUDE.md
+.claude/
+.claudeignore
+
+# Temporary / debug
+*.tmp
+*.temp
+*.bak
