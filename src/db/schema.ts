@@ -1,10 +1,15 @@
-import { pgTable, varchar, text, timestamp } from "drizzle-orm/pg-core";
+import { pgTable, varchar, text, timestamp, pgEnum } from "drizzle-orm/pg-core";
+
+export const genderEnum = pgEnum("gender", ["male", "female", "other"]);
 
 export const usersTable = pgTable("users", {
   id: text("id").primaryKey(),
   name: varchar("name", { length: 255 }).notNull(),
   email: varchar("email", { length: 255 }).notNull().unique(),
   googleSub: varchar("google_sub", { length: 255 }).notNull().unique(),
+  city: varchar("city", { length: 255 }),
+  photo: varchar("photo", { length: 500 }),
+  gender: genderEnum("gender"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
