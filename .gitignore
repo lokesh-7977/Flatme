@@ -12,8 +12,8 @@ dist/
 build/
 out/
 
-# Drizzle generated output (keep migrations dir but not meta)
-drizzle/meta/
+# Drizzle generated output
+drizzle/
 
 # Logs
 *.log
