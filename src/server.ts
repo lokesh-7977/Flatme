@@ -28,7 +28,33 @@ app.use(
 
 app.use("*", requestIdMiddleware);
 
-app.get("/health", (c) => c.json({ status: "ok", timestamp: new Date().toISOString() }));
+app.get("/health", async (c) => {
+  let dbStatus: "connected" | "disconnected" = "disconnected";
+  try {
+    await pool.query("SELECT 1");
+    dbStatus = "connected";
+  } catch {
+    dbStatus = "disconnected";
+  }
+
+  const status = dbStatus === "connected" ? "ok" : "degraded";
+
+  return c.json(
+    {
+      status,
+      timestamp: new Date().toISOString(),
+      service: {
+        name: "Flatme API",
+        version: "1.0.0",
+        environment: config.NODE_ENV,
+        uptime: Math.floor(process.uptime()),
+        port: config.PORT,
+      },
+      db: { status: dbStatus },
+    },
+    status === "ok" ? 200 : 503,
+  );
+});
 
 app.onError((err, c) => {
   const requestId = c.get("requestId");
