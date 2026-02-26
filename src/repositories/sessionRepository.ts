@@ -1,8 +1,9 @@
-import { and, eq, lt } from "drizzle-orm";
-import { db } from "../db";
-import { sessionsTable } from "../db";
-import type { Session } from "../db";
+import { and, asc, eq, lt } from "drizzle-orm";
 import { uuidv7 } from "uuidv7";
+import { config } from "../config/env";
+import type { Session } from "../db";
+import { db, sessionsTable } from "../db";
+import { hashToken } from "../lib/hash";
 
 export const sessionRepository = {
   async createSession(
@@ -18,12 +19,27 @@ export const sessionRepository = {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 30);
 
+    // Enforce max sessions per user: delete oldest sessions beyond the limit.
+    const existing = await db
+      .select({ id: sessionsTable.id, createdAt: sessionsTable.createdAt })
+      .from(sessionsTable)
+      .where(eq(sessionsTable.userId, userId))
+      .orderBy(asc(sessionsTable.createdAt));
+
+    if (existing.length >= config.MAX_SESSIONS_PER_USER) {
+      const toDelete = existing.slice(0, existing.length - config.MAX_SESSIONS_PER_USER + 1);
+      for (const s of toDelete) {
+        await db.delete(sessionsTable).where(eq(sessionsTable.id, s.id));
+      }
+    }
+
     const result = await db
       .insert(sessionsTable)
       .values({
         id: sessionId,
         userId,
-        refreshToken,
+        // Store only the hash — the raw token lives only in the signed JWT cookie.
+        refreshToken: hashToken(refreshToken),
         expiresAt,
         userAgent: metadata?.userAgent,
         ipAddress: metadata?.ipAddress,
@@ -35,8 +51,9 @@ export const sessionRepository = {
 
   /**
    * Atomically swaps the refresh token for a session.
-   * Returns the updated session, or null if the (sessionId + oldToken) pair
-   * was not found — which means the token was already rotated (reuse attack).
+   * Compares hashed tokens so the DB never holds raw token values.
+   * Returns the updated session, or null if the (sessionId + oldTokenHash) pair
+   * was not found — which indicates a token reuse attack.
    */
   async rotateRefreshToken(
     sessionId: string,
@@ -45,12 +62,9 @@ export const sessionRepository = {
   ): Promise<Session | null> {
     const result = await db
       .update(sessionsTable)
-      .set({ refreshToken: newToken, lastUsedAt: new Date() })
+      .set({ refreshToken: hashToken(newToken), lastUsedAt: new Date() })
       .where(
-        and(
-          eq(sessionsTable.id, sessionId),
-          eq(sessionsTable.refreshToken, oldToken),
-        ),
+        and(eq(sessionsTable.id, sessionId), eq(sessionsTable.refreshToken, hashToken(oldToken))),
       )
       .returning();
 
@@ -76,8 +90,6 @@ export const sessionRepository = {
   },
 
   async deleteExpiredSessions(): Promise<void> {
-    await db
-      .delete(sessionsTable)
-      .where(lt(sessionsTable.expiresAt, new Date()));
+    await db.delete(sessionsTable).where(lt(sessionsTable.expiresAt, new Date()));
   },
 };
