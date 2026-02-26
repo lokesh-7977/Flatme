@@ -1,4 +1,4 @@
-import { pgTable, varchar, text, timestamp, pgEnum } from "drizzle-orm/pg-core";
+import { pgEnum, pgTable, text, timestamp, varchar } from "drizzle-orm/pg-core";
 
 export const genderEnum = pgEnum("gender", ["male", "female", "other"]);
 
@@ -16,7 +16,9 @@ export const usersTable = pgTable("users", {
 
 export const sessionsTable = pgTable("sessions", {
   id: text("id").primaryKey(),
-  userId: text("user_id").notNull().references(() => usersTable.id, { onDelete: "cascade" }),
+  userId: text("user_id")
+    .notNull()
+    .references(() => usersTable.id, { onDelete: "cascade" }),
   refreshToken: text("refresh_token").notNull().unique(),
   expiresAt: timestamp("expires_at").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),

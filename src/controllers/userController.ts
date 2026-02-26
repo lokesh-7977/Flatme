@@ -1,6 +1,6 @@
-import { Context } from "hono";
+import type { Context } from "hono";
+import { NotFoundError, UnauthorizedError } from "../lib/errors";
 import { userService } from "../services/userService";
-import { UnauthorizedError, NotFoundError } from "../lib/errors";
 
 export async function getMeHandler(c: Context) {
   const userId = c.get("userId") as string | undefined;

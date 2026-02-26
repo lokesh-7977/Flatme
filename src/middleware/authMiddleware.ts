@@ -1,7 +1,7 @@
-import { Context, Next } from "hono";
+import type { Context, Next } from "hono";
 import { getCookie } from "hono/cookie";
-import { verifyAccessToken } from "../lib/jwt";
 import { UnauthorizedError } from "../lib/errors";
+import { verifyAccessToken } from "../lib/jwt";
 
 export async function authMiddleware(c: Context, next: Next) {
   const authHeader = c.req.header("Authorization");

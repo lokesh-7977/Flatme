@@ -1,4 +1,4 @@
-export type { User, Session } from "../db";
+export type { Session, User } from "../db";
 
 export type GoogleUser = {
   id: string;

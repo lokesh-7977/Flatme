@@ -1,4 +1,4 @@
-import { SignJWT, jwtVerify } from "jose";
+import { jwtVerify, SignJWT } from "jose";
 import { config } from "../config/env";
 
 const JWT_SECRET = new TextEncoder().encode(config.JWT_SECRET);
@@ -28,7 +28,7 @@ export async function verifyAccessToken(token: string): Promise<{ userId: string
 }
 
 export async function verifyRefreshToken(
-  token: string
+  token: string,
 ): Promise<{ userId: string; sessionId: string }> {
   const { payload } = await jwtVerify(token, JWT_SECRET);
   if (payload.type !== "refresh") throw new Error("Invalid token type");

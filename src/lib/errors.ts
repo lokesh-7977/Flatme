@@ -1,8 +1,10 @@
+import type { ContentfulStatusCode } from "hono/utils/http-status";
+
 export class AppError extends Error {
   constructor(
     public readonly message: string,
-    public readonly statusCode: number = 500,
-    public readonly code?: string
+    public readonly statusCode: ContentfulStatusCode = 500,
+    public readonly code?: string,
   ) {
     super(message);
     this.name = "AppError";

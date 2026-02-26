@@ -1,8 +1,7 @@
 import { eq } from "drizzle-orm";
-import { db } from "../db";
-import { usersTable } from "../db";
-import type { User } from "../db";
 import { uuidv7 } from "uuidv7";
+import type { User } from "../db";
+import { db, usersTable } from "../db";
 
 export const userRepository = {
   async findByGoogleSub(googleSub: string): Promise<User | undefined> {
@@ -15,11 +14,7 @@ export const userRepository = {
     return result[0];
   },
 
-  async createWithGoogleSub(profile: {
-    id: string;
-    name: string;
-    email: string;
-  }): Promise<User> {
+  async createWithGoogleSub(profile: { id: string; name: string; email: string }): Promise<User> {
     const userId = uuidv7();
 
     const insertData = {
@@ -35,11 +30,7 @@ export const userRepository = {
   },
 
   async findById(id: string): Promise<User | undefined> {
-    const result = await db
-      .select()
-      .from(usersTable)
-      .where(eq(usersTable.id, id))
-      .limit(1);
+    const result = await db.select().from(usersTable).where(eq(usersTable.id, id)).limit(1);
 
     return result[0];
   },
