@@ -14,6 +14,8 @@ const envSchema = z.object({
   MAX_SESSIONS_PER_USER: z.coerce.number().int().min(1).max(20).default(5),
   /** PostgreSQL pool max connections */
   DB_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
+  /** HTTP server port */
+  PORT: z.coerce.number().int().min(1).max(65535).default(3000),
 });
 
 const parsed = envSchema.safeParse(process.env);
