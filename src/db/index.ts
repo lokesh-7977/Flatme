@@ -2,7 +2,7 @@ import { drizzle } from "drizzle-orm/node-postgres";
 import { Pool } from "pg";
 import { config } from "../config/env";
 
-const pool = new Pool({
+export const pool = new Pool({
   connectionString: config.DATABASE_URL,
   max: config.DB_POOL_MAX,
   idleTimeoutMillis: 30_000,

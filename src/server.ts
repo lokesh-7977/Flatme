@@ -5,7 +5,7 @@ import { HTTPException } from "hono/http-exception";
 import { secureHeaders } from "hono/secure-headers";
 import { ZodError, z } from "zod";
 import { config, IS_PROD } from "./config/env";
-import { db } from "./db";
+import { pool } from "./db";
 import { AppError } from "./lib/errors";
 import { logger } from "./lib/logger";
 import { requestIdMiddleware } from "./middleware/requestIdMiddleware";
@@ -75,8 +75,7 @@ logger.info(`Server listening on http://localhost:${config.PORT}`);
 async function shutdown(signal: string) {
   logger.info(`${signal} received — shutting down gracefully`);
   server.stop(true);
-  // @ts-expect-error — drizzle wraps the pool; access via $client
-  await (db.$client as { end: () => Promise<void> }).end().catch(() => {});
+  await pool.end().catch(() => {});
   logger.info("Shutdown complete");
   process.exit(0);
 }
