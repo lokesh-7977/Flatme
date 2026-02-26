@@ -11,6 +11,7 @@ import { requestIdMiddleware } from "./middleware/requestIdMiddleware";
 import { apiRoutes } from "./routes/apiRoutes";
 import { authRoutes } from "./routes/authRoutes";
 
+const SERVER_START = Date.now();
 const app = new Hono();
 
 app.use("*", secureHeaders());
@@ -47,8 +48,9 @@ app.get("/health", async (c) => {
         name: "Flatme API",
         version: "1.0.0",
         environment: config.NODE_ENV,
-        uptime: Math.floor(process.uptime()),
         port: config.PORT,
+        // Uptime % of last 24 h window — 100 if up ≥ 24 h, proportional if recently started
+        uptime: Math.min(100, Math.round(((Date.now() - SERVER_START) / (24 * 60 * 60 * 1000)) * 100)),
       },
       db: { status: dbStatus },
     },
