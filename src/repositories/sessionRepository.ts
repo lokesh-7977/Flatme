@@ -1,4 +1,4 @@
-import { and, asc, eq, lt } from "drizzle-orm";
+import { and, asc, desc, eq, inArray, lt, ne } from "drizzle-orm";
 import { uuidv7 } from "uuidv7";
 import { config } from "../config/env";
 import type { Session } from "../db";
@@ -19,18 +19,17 @@ export const sessionRepository = {
     const expiresAt = new Date();
     expiresAt.setDate(expiresAt.getDate() + 30);
 
-    // Enforce max sessions per user: delete oldest sessions beyond the limit.
+    // Enforce max sessions per user: batch-delete oldest sessions beyond the cap.
     const existing = await db
-      .select({ id: sessionsTable.id, createdAt: sessionsTable.createdAt })
+      .select({ id: sessionsTable.id })
       .from(sessionsTable)
       .where(eq(sessionsTable.userId, userId))
       .orderBy(asc(sessionsTable.createdAt));
 
     if (existing.length >= config.MAX_SESSIONS_PER_USER) {
-      const toDelete = existing.slice(0, existing.length - config.MAX_SESSIONS_PER_USER + 1);
-      for (const s of toDelete) {
-        await db.delete(sessionsTable).where(eq(sessionsTable.id, s.id));
-      }
+      const overflow = existing.length - config.MAX_SESSIONS_PER_USER + 1;
+      const idsToDelete = existing.slice(0, overflow).map((s) => s.id);
+      await db.delete(sessionsTable).where(inArray(sessionsTable.id, idsToDelete));
     }
 
     const result = await db
@@ -79,6 +78,15 @@ export const sessionRepository = {
       .limit(1);
 
     return result[0];
+  },
+
+  /** Returns all active (non-expired) sessions for a user, newest first. */
+  async findUserSessions(userId: string): Promise<Session[]> {
+    return db
+      .select()
+      .from(sessionsTable)
+      .where(and(eq(sessionsTable.userId, userId), ne(sessionsTable.expiresAt, new Date(0))))
+      .orderBy(desc(sessionsTable.lastUsedAt));
   },
 
   async deleteSession(sessionId: string): Promise<void> {
