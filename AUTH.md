@@ -30,7 +30,8 @@ sequenceDiagram
     User->>Google: Approve
     Google->>App: GET /auth/google/callback?code=...
     App->>Google: Exchange code for profile
-    Google-->>App: { id, name, email }
+    Google-->>App: { id, name, email, verified_email }
+    App->>App: Reject if verified_email == false
     App->>DB: Find user by googleSub
     alt New user
         DB-->>App: Not found
@@ -40,8 +41,9 @@ sequenceDiagram
     end
     App->>App: Generate sessionId (uuidv7)
     App->>App: Sign accessToken + refreshToken in parallel
-    App->>DB: Insert session row
-    App-->>User: Set accessToken cookie (1h) + refreshToken cookie (30d)
+    App->>DB: Enforce session cap (delete oldest if > MAX_SESSIONS_PER_USER)
+    App->>DB: Insert session row (refreshToken stored as SHA-256 hash)
+    App-->>User: Set accessToken cookie (15 min) + refreshToken cookie (30 days)
     App-->>User: Redirect to /
 ```
 
@@ -60,20 +62,25 @@ sequenceDiagram
     Client->>App: POST /auth/refresh (refreshToken cookie)
     App->>App: Verify JWT signature + expiry
     App->>App: Sign new accessToken + refreshToken in parallel
-    App->>DB: UPDATE session SET refreshToken = new WHERE id = ? AND refreshToken = old
+    App->>DB: UPDATE session SET refreshToken = hash(new) WHERE id = ? AND refreshToken = hash(old)
     alt Row updated (token was valid)
         DB-->>App: Updated session
+        App->>App: Check session.expiresAt — reject if expired
         App-->>Client: Set new accessToken cookie + new refreshToken cookie
-    else Row not updated (token already used)
+    else Row not updated (token already used — reuse attack)
         DB-->>App: 0 rows
         App->>DB: Delete ALL sessions for this user
-        App-->>Client: 401 Token reuse detected
+        App-->>Client: 401 TOKEN_REUSE
     end
 ```
 
 ### Why rotate the refresh token?
 
 If someone steals a refresh token and uses it, the next time the real user tries to refresh, the old token won't match what's in the DB. We detect that and kill every session for that account.
+
+### Why hash the refresh token?
+
+Refresh tokens are stored as SHA-256 hashes in the DB. A full DB breach can't yield tokens that could be replayed — the raw values only ever live in the signed JWT cookies.
 
 ---
 
@@ -110,6 +117,31 @@ The middleware checks the `Authorization: Bearer` header first, then falls back 
 
 ---
 
+## Session management
+
+Users can list and revoke their own sessions. This is useful for "sign out everywhere" flows or auditing active devices.
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant App
+    participant DB
+
+    User->>App: GET /api/me/sessions (accessToken)
+    App->>DB: SELECT sessions WHERE userId = ? ORDER BY lastUsedAt DESC
+    DB-->>App: [ { id, userAgent, ipAddress, createdAt, lastUsedAt, expiresAt } ]
+    App-->>User: 200 { sessions: [...] }
+
+    User->>App: DELETE /api/me/sessions/:id (accessToken)
+    App->>DB: Verify session.userId == requestingUserId
+    App->>DB: DELETE session
+    App-->>User: 200 { message: "Session revoked" }
+```
+
+Raw `refreshToken` hashes are never returned — only metadata.
+
+---
+
 ## Database tables
 
 ### users
@@ -118,27 +150,28 @@ The middleware checks the `Authorization: Bearer` header first, then falls back 
 |---|---|---|
 | id | text | UUIDv7, primary key |
 | name | varchar(255) | From Google profile |
-| email | varchar(255) | Unique |
-| google_sub | varchar(255) | Google's user ID, unique |
-| city | varchar(255) | Optional |
-| photo | varchar(500) | Optional |
-| gender | enum | `male`, `female`, `other` |
+| email | varchar(255) | Unique, indexed |
+| google_sub | varchar(255) | Google's user ID, unique, indexed |
+| city | varchar(255) | Optional, user-editable |
+| photo | varchar(500) | Optional, user-editable |
+| gender | enum | `male`, `female`, `other`, user-editable |
 | created_at | timestamp | Auto |
-| updated_at | timestamp | Auto |
+| updated_at | timestamp | Updated on every `PATCH /api/me` |
 
 ### sessions
 
 | Column | Type | Notes |
 |---|---|---|
 | id | text | UUIDv7, primary key |
-| user_id | text | FK → users.id, cascade delete |
-| refresh_token | text | Rotated on every refresh |
-| expires_at | timestamp | 30 days from creation |
-| last_used_at | timestamp | Updated on every refresh |
+| user_id | text | FK → users.id, cascade delete, indexed |
+| refresh_token | text | SHA-256 hash of the raw token |
+| expires_at | timestamp | 30 days from creation, indexed |
+| created_at | timestamp | Auto |
+| last_used_at | timestamp | Updated on every token rotation |
 | user_agent | varchar(500) | Browser/device info |
-| ip_address | varchar(45) | Supports IPv6 |
+| ip_address | varchar(45) | First IP from x-forwarded-for; supports IPv6 |
 
-One user can have multiple sessions (multiple devices). Deleting a user cascades to all their sessions.
+One user can have multiple sessions (multiple devices). Max concurrent sessions is configurable via `MAX_SESSIONS_PER_USER` (default 5). Oldest sessions are pruned automatically when the cap is hit. Deleting a user cascades to all their sessions.
 
 ---
 
@@ -155,13 +188,29 @@ One user can have multiple sessions (multiple devices). Deleting a user cascades
 
 ## Endpoints
 
-| Method | Path | Auth required | What it does |
+### Auth
+
+| Method | Path | Auth | Rate limit | What it does |
+|---|---|---|---|---|
+| GET | `/auth/google` | No | 20 / 15 min | Initiate Google OAuth |
+| GET | `/auth/google/callback` | No | 20 / 15 min | Google redirects here after consent |
+| POST | `/auth/refresh` | No | 30 / 15 min | Rotate refresh token, issue new access token |
+| POST | `/auth/logout` | No | 20 / 15 min | Delete session, clear cookies |
+
+### User profile & sessions
+
+| Method | Path | Auth | Body | What it does |
+|---|---|---|---|---|
+| GET | `/api/me` | Yes | — | Current user profile (googleSub excluded) |
+| PATCH | `/api/me` | Yes | `{ name?, city?, photo?, gender? }` | Update profile fields |
+| GET | `/api/me/sessions` | Yes | — | List all active sessions (no token hashes) |
+| DELETE | `/api/me/sessions/:id` | Yes | — | Revoke a specific session by ID |
+
+### System
+
+| Method | Path | Auth | What it does |
 |---|---|---|---|
-| GET | /auth/google | No | Kicks off Google OAuth |
-| GET | /auth/google/callback | No | Google redirects here after consent |
-| POST | /auth/refresh | No | Rotates refresh token, issues new access token |
-| POST | /auth/logout | No | Deletes session, clears cookies |
-| GET | /api/me | Yes | Returns current user (no googleSub) |
+| GET | `/health` | No | `{ status: "ok", timestamp }` |
 
 ---
 
