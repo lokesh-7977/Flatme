@@ -12,8 +12,8 @@ dist/
 build/
 out/
 
-# Drizzle generated output
-drizzle/
+# Drizzle — track migrations, ignore local metadata
+drizzle/meta/
 
 # Logs
 *.log
