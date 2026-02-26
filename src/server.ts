@@ -5,6 +5,7 @@ import { HTTPException } from "hono/http-exception";
 import { secureHeaders } from "hono/secure-headers";
 import { ZodError, z } from "zod";
 import { config, IS_PROD } from "./config/env";
+import { db } from "./db";
 import { AppError } from "./lib/errors";
 import { logger } from "./lib/logger";
 import { requestIdMiddleware } from "./middleware/requestIdMiddleware";
@@ -65,5 +66,22 @@ app.get("/", serveStatic({ path: "./src/public/index.html" }));
 
 app.route("/auth", authRoutes);
 app.route("/api", apiRoutes);
+
+// ── Server startup ───────────────────────────────────────────────────────────
+const server = Bun.serve({ fetch: app.fetch, port: config.PORT });
+logger.info(`Server listening on http://localhost:${config.PORT}`);
+
+// ── Graceful shutdown ────────────────────────────────────────────────────────
+async function shutdown(signal: string) {
+  logger.info(`${signal} received — shutting down gracefully`);
+  server.stop(true);
+  // @ts-expect-error — drizzle wraps the pool; access via $client
+  await (db.$client as { end: () => Promise<void> }).end().catch(() => {});
+  logger.info("Shutdown complete");
+  process.exit(0);
+}
+
+process.on("SIGTERM", () => shutdown("SIGTERM"));
+process.on("SIGINT", () => shutdown("SIGINT"));
 
 export default app;
