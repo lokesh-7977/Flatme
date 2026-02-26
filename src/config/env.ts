@@ -8,6 +8,12 @@ const envSchema = z.object({
   GOOGLE_CLIENT_ID: z.string().min(1, "GOOGLE_CLIENT_ID is required"),
   GOOGLE_CLIENT_SECRET: z.string().min(1, "GOOGLE_CLIENT_SECRET is required"),
   GOOGLE_REDIRECT_URI: z.string().url("GOOGLE_REDIRECT_URI must be a valid URL"),
+  /** Comma-separated allowed CORS origins, e.g. "https://app.example.com" */
+  CORS_ORIGIN: z.string().default("*"),
+  /** Maximum concurrent sessions per user (prevents session flooding) */
+  MAX_SESSIONS_PER_USER: z.coerce.number().int().min(1).max(20).default(5),
+  /** PostgreSQL pool max connections */
+  DB_POOL_MAX: z.coerce.number().int().min(1).max(100).default(10),
 });
 
 const parsed = envSchema.safeParse(process.env);
