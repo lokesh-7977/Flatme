@@ -1,5 +1,4 @@
 import { Hono } from "hono";
-import { serveStatic } from "hono/bun";
 import { cors } from "hono/cors";
 import { HTTPException } from "hono/http-exception";
 import { secureHeaders } from "hono/secure-headers";
@@ -61,8 +60,7 @@ app.onError((err, c) => {
   );
 });
 
-app.use("/*", serveStatic({ root: "./src/public" }));
-app.get("/", serveStatic({ path: "./src/public/index.html" }));
+app.get("/", (c) => c.json({ name: "Flatme API", version: "1.0.0" }));
 
 app.route("/auth", authRoutes);
 app.route("/api", apiRoutes);
