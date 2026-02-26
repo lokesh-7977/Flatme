@@ -1,14 +1,15 @@
-import { Hono } from "hono";
 import { googleAuth } from "@hono/oauth-providers/google";
 import { zValidator } from "@hono/zod-validator";
+import { Hono } from "hono";
 import { z } from "zod";
 import { config } from "../config/env";
 import {
   googleAuthHandler,
   googleCallbackHandler,
-  refreshTokenHandler,
   logoutHandler,
+  refreshTokenHandler,
 } from "../controllers/authController";
+import { rateLimit } from "../middleware/rateLimitMiddleware";
 
 export const authRoutes = new Hono();
 
@@ -24,18 +25,25 @@ const refreshCookieSchema = z.object({
   refreshToken: z.string().min(1, "refreshToken cookie is required"),
 });
 
-authRoutes.get("/google", googleAuth(googleAuthConfig), googleAuthHandler);
+// Rate limits — keyed by IP
+const authInitLimit = rateLimit({ limit: 20, windowMs: 15 * 60 * 1000 }); // 20 OAuth initiations / 15 min
+const refreshLimit = rateLimit({ limit: 30, windowMs: 15 * 60 * 1000 }); // 30 refresh calls / 15 min
+const logoutLimit = rateLimit({ limit: 20, windowMs: 15 * 60 * 1000 }); // 20 logout calls / 15 min
+
+authRoutes.get("/google", authInitLimit, googleAuth(googleAuthConfig), googleAuthHandler);
 
 authRoutes.get(
   "/google/callback",
+  authInitLimit,
   googleAuth(googleAuthConfig),
-  googleCallbackHandler
+  googleCallbackHandler,
 );
 
 authRoutes.post(
   "/refresh",
+  refreshLimit,
   zValidator("cookie", refreshCookieSchema),
-  refreshTokenHandler
+  refreshTokenHandler,
 );
 
-authRoutes.post("/logout", logoutHandler);
+authRoutes.post("/logout", logoutLimit, logoutHandler);
